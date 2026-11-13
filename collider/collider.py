@@ -138,6 +138,38 @@ class ChemicalSphere(Sphere):
             other.x = -1000
             other.y = -1000
 
+    def dissociate(self): 
+        # Only green particles can split 
+        if self.atom is not nitric_oxide:
+            return None
+        
+        # small probability of splitting per simulation step 
+        if np.random.random() >= 0.001:
+            return None
+        
+        # change this particle into a yellow particle 
+        angle = np.random.uniform(0,2 * np.pi)
+        nx = np.cos(angle)
+        ny = np.sin(angle)
+        self.atom = oxygen
+        self.radius = oxygen.radius 
+        self.color = oxygen.color
+        self.mass = oxygen.mass if oxygen.mass is not None else self.radius**2
+
+        # change a blue particle next to it 
+
+        distance = oxygen.radius + nitrogen.radius + 2 
+        other = ChemicalSphere(self.x + distance * nx, 
+                               self.y + distance * ny, 
+                               self.vx + nx, 
+                               self.vy + ny, 
+                               nitrogen, 
+                               )
+        self.vx -= nx
+        self.vy -= ny
+        return other
+
+
 
 class Wall:
     """A class to represent a wall on our canvas."""
@@ -166,7 +198,7 @@ class Wall:
         # Check for horizontal walls
         elif self.y1 == self.y2:
             if self.y1 - sphere.radius < sphere.y < self.y1 + sphere.radius:
-                if self.x1 < sphere.x < self.x2 or self.x2 < sphere.x < self.x1:
+                if min(self.x1, self.x2) - sphere.radius < sphere.x < max(self.x1, self.x2) + sphere.radius:
                     if (sphere.y < self.y1) and sphere.vy > 0:
                         sphere.vy = -sphere.vy
                     elif (sphere.y > self.y1) and sphere.vy < 0:
@@ -203,18 +235,42 @@ class Simulation:
             Wall(0, 0, 0, self.height),  # Left wall
             Wall(self.width, 0, self.width, self.height),  # Right wall
         ]
-        middle = self.width / 2 # finds the horizontal centre
-        if divider == "solid": 
-            walls.append(Wall(middle, 0, middle, self.height))
-        elif divider == "gap":
+        left = self.width / 2 - 10 # finds the horizontal centre
+        right = self.width / 2 + 10
+
+        if divider == "gap":
             gap_top = self.height / 2 - 60
             gap_bottom = self.height / 2 + 60
-            walls.append(Wall(middle,0,middle,self.height))
-            walls.append(Wall(middle,gap_bottom, middle, self.height))
+            # Upper wall
+            walls.extend([Wall(left, 0, left, gap_top), 
+                          Wall(right, 0, right, gap_top), 
+                          Wall(left, gap_top, right, gap_top), 
+                          ])
+            
+            # lower wall
+            walls.extend([Wall(left, gap_bottom, left, self.height), 
+                          Wall(right, gap_bottom, right , self.height), 
+                          Wall(left, gap_bottom, right, gap_bottom),
+                          ])
+
+        elif divider == "solid": 
+            walls.extend([Wall(left, 0, left, self.height),
+                          Wall(right, 0, right, self.height), 
+                          ])
+    
 
         return walls
 
     def update(self):
+        new_spheres = []
+        # only do dissociation when needded
+        if getattr(self, "dissociation", True):
+            for sphere in self.spheres:
+                new_sphere = sphere.dissociate()
+                if new_sphere is not None: 
+                    new_spheres.append(new_sphere)
+        self.spheres.extend(new_spheres)
+
         for sphere in self.spheres:
             sphere.move()
             for wall in self.walls:
