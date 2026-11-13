@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ipycanvas import Canvas, hold_canvas
 
 
+
 @dataclass
 class Color:
     fill: str
@@ -195,13 +196,22 @@ class Simulation:
             spheres.append(ChemicalSphere(x, y, vx, vy, atom))
         return spheres
 
-    def create_side_walls(self):
+    def create_side_walls(self, divider = "none"): # divider selects the parition type 
         walls = [
             Wall(0, 0, self.width, 0),  # Top wall
             Wall(0, self.height, self.width, self.height),  # Bottom wall
             Wall(0, 0, 0, self.height),  # Left wall
             Wall(self.width, 0, self.width, self.height),  # Right wall
         ]
+        middle = self.width / 2 # finds the horizontal centre
+        if divider == "solid": 
+            walls.append(Wall(middle, 0, middle, self.height))
+        elif divider == "gap":
+            gap_top = self.height / 2 - 60
+            gap_bottom = self.height / 2 + 60
+            walls.append(Wall(middle,0,middle,self.height))
+            walls.append(Wall(middle,gap_bottom, middle, self.height))
+
         return walls
 
     def update(self):
